@@ -1,7 +1,6 @@
 package com.example.hello_spring_security.security;
 
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,23 +15,42 @@ public class JwtProvider {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
-    // Hàm sinh JWT từ thông tin UserPrincipal
+    // 1. Hàm sinh JWT từ thông tin UserPrincipal
     public String generateToken(UserPrincipal userPrincipal) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
 
-        // Lấy role đầu tiên (bỏ tiền tố ROLE_ nếu muốn lưu gọn như "USER", "ADMIN")
         String role = userPrincipal.getAuthorities().stream()
                 .findFirst()
                 .map(auth -> auth.getAuthority().replace("ROLE_", ""))
                 .orElse("USER");
 
         return Jwts.builder()
-                .setSubject(userPrincipal.getUsername()) // Lưu username
-                .claim("role", role)                     // Lưu role vào Payload
+                .setSubject(userPrincipal.getUsername())
+                .claim("role", role)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
+    }
+
+    // 2. Hàm lấy username từ chuỗi JWT
+    public String getUsernameFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(jwtSecret)
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.getSubject();
+    }
+
+    // 3. Hàm kiểm tra tính hợp lệ của Token (chữ ký, hết hạn)
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            System.out.println("JWT không hợp lệ hoặc đã hết hạn: " + e.getMessage());
+        }
+        return false;
     }
 }
