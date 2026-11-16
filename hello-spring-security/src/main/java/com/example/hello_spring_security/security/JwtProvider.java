@@ -15,7 +15,6 @@ public class JwtProvider {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
-    // 1. Hàm sinh JWT từ thông tin UserPrincipal
     public String generateToken(UserPrincipal userPrincipal) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
@@ -34,7 +33,6 @@ public class JwtProvider {
                 .compact();
     }
 
-    // 2. Hàm lấy username từ chuỗi JWT
     public String getUsernameFromToken(String token) {
         Claims claims = Jwts.parser()
                 .setSigningKey(jwtSecret)
@@ -43,14 +41,9 @@ public class JwtProvider {
         return claims.getSubject();
     }
 
-    // 3. Hàm kiểm tra tính hợp lệ của Token (chữ ký, hết hạn)
+    // Ném các lỗi JWT cụ thể để Filter bắt và ghi nhận thông báo chi tiết
     public boolean validateToken(String token) {
-        try {
-            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            System.out.println("JWT không hợp lệ hoặc đã hết hạn: " + e.getMessage());
-        }
-        return false;
+        Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token);
+        return true;
     }
 }

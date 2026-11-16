@@ -1,5 +1,9 @@
 package com.example.hello_spring_security.security;
 
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.SignatureException;
+import io.jsonwebtoken.UnsupportedJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,16 +33,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
-            // 1. Lấy chuỗi JWT từ Header Authorization (dạng Bearer <token>)
             String jwt = getJwtFromRequest(request);
 
-            // 2. Validate Token (Check chữ ký, check hết hạn)
             if (StringUtils.hasText(jwt) && jwtProvider.validateToken(jwt)) {
-                // 3. Lấy username từ Token -> Load UserDetails
                 String username = jwtProvider.getUsernameFromToken(jwt);
                 UserDetails userDetails = userDetailServiceCustom.loadUserByUsername(username);
 
-                // 4. Tạo UsernamePasswordAuthenticationToken và gán vào SecurityContext
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
@@ -49,15 +49,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
-        } catch (Exception ex) {
-            System.out.println("Không thể thiết lập xác thực người dùng: " + ex.getMessage());
+        } catch (ExpiredJwtException ex) {
+            request.setAttribute("jwt_error", "Unauthorized: Token đã hết hạn (ExpiredJwtException)");
+        } catch (MalformedJwtException ex) {
+            request.setAttribute("jwt_error", "Unauthorized: Token không đúng định dạng (MalformedJwtException)");
+        } catch (SignatureException ex) {
+            request.setAttribute("jwt_error", "Lỗi xác thực Token: Chữ ký không hợp lệ (" + ex.getMessage() + ")");
+        } catch (UnsupportedJwtException ex) {
+            request.setAttribute("jwt_error", "Unauthorized: Token không được hỗ trợ");
+        } catch (IllegalArgumentException ex) {
+            request.setAttribute("jwt_error", "Unauthorized: Chuỗi Token rỗng hoặc không hợp lệ");
         }
 
-        // Cho phép request đi tiếp tới các Filter hoặc Controller tiếp theo
         filterChain.doFilter(request, response);
     }
 
-    // Hàm hỗ trợ bóc tách chuỗi token sau chữ "Bearer "
     private String getJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
